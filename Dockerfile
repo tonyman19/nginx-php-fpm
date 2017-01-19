@@ -1,10 +1,12 @@
+#docker build -t nginx-php-nsis:latest .
+
 FROM nginx:mainline-alpine
 
-MAINTAINER ngineered <support@ngineered.co.uk>
+MAINTAINER antomat <anton.matviyenko@gmail.com>
 
 ENV php_conf /etc/php5/php.ini
 ENV fpm_conf /etc/php5/php-fpm.conf
-ENV composer_hash 61069fe8c6436a4468d0371454cf38a812e451a14ab1691543f25a9627b97ff96d8753d92a00654c21e2212a5ae1ff36
+#ENV composer_hash 61069fe8c6436a4468d0371454cf38a812e451a14ab1691543f25a9627b97ff96d8753d92a00654c21e2212a5ae1ff36
 
 RUN echo @testing http://nl.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories && \
     echo /etc/apk/respositories && \
@@ -47,22 +49,30 @@ RUN echo @testing http://nl.alpinelinux.org/alpine/edge/testing >> /etc/apk/repo
     openssl-dev \
     ca-certificates \
     dialog \
-    gcc \
-    musl-dev \
     linux-headers \
-    libffi-dev &&\
+    libffi-dev \
+    gcc musl-dev autoconf curl-dev make scons g++ && \
     mkdir -p /etc/nginx && \
     mkdir -p /var/www/app && \
     mkdir -p /run/nginx && \
-    mkdir -p /var/log/supervisor &&\
+    mkdir -p /var/log/supervisor && \
     php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
-    php -r "if (hash_file('SHA384', 'composer-setup.php') === '${composer_hash}') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" && \
+#    php -r "if (hash_file('SHA384', 'composer-setup.php') === '${composer_hash}') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" && \
     php composer-setup.php --install-dir=/usr/bin --filename=composer && \
     php -r "unlink('composer-setup.php');" && \
     pip install -U pip && \
     pip install -U certbot && \
     mkdir -p /etc/letsencrypt/webrootauth && \
-    apk del gcc musl-dev linux-headers libffi-dev augeas-dev python-dev
+    mkdir -p /tmp/nsis && cd /tmp/nsis && \
+    wget https://netcologne.dl.sourceforge.net/project/nsis/NSIS%203/3.01/nsis-3.01-src.tar.bz2 && tar xvfj nsis*.tar.bz2 && \
+    wget https://netcologne.dl.sourceforge.net/project/nsis/NSIS%203/3.01/nsis-3.01.zip && unzip nsis-3.01.zip  && \
+    wget https://netcologne.dl.sourceforge.net/project/osslsigncode/osslsigncode/osslsigncode-1.7.1.tar.gz && tar xvzf osslsigncode*.tar.gz  && \
+    cd /tmp/nsis/osslsigncode*/ && ./configure && make && make install && \
+    cd /tmp/nsis/nsis-3.01-src && scons SKIPSTUBS=all SKIPPLUGINS=all SKIPUTILS=all SKIPMISC=all NSIS_CONFIG_CONST_DATA_PATH=no PREFIX=/tmp/nsis/nsis-3.01/Bin install-compiler # && \
+    cp -r /tmp/nsis/nsis-3.01 /usr/local/bin/ && \
+    rm -rf /tmp/nsis/ && \
+    apk del linux-headers libffi-dev augeas-dev python-dev && \
+    apk del gcc musl-dev autoconf curl-dev make scons g++
 
 
 ADD conf/supervisord.conf /etc/supervisord.conf
